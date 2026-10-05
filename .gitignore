@@ -1,0 +1,27 @@
+depends
+node_modules/
+
+# Generated userscript
+/rebugger.user.js
+/rebugger.user.js.map
+
+# test coverage and caches
+coverage/
+.nyc_output/
+.cache/
+
+*.log
+
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+core
+run/
+
