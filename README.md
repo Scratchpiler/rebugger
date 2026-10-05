@@ -269,9 +269,3 @@ It is a freeze that rolls a new value each time, so it follows the same rules: i
 | `animate.js` | the motion vocabulary (keyframes and durations) and a reduced-motion-aware player |
 
 Only `stepper.js` touches `runtime._step`. Every other module registers a tap with an `order`, and the stepper runs every tap's `before`, then the real step, then every tap's `after`, in order: playback (10), pins (20), recording (30), watchers (40). A tap's `active()` tells the stepper when the wrapper can come off.
-
-## Tests
-
-`npm test` builds and then runs `node --test tests/*.test.js` (262 tests). It borrows the `scratch-vm` devDependency in `../slvm` and `jsdom` from `../scratchpiler`, so run `npm install` in both first. `tests/helpers.js` has the shared project builders; the page-install test runs the built `rebugger.user.js`. The panel is tested in jsdom against a real headless scratch-vm (`panel.test.js`: rendering, inline edit, pinning, drawers, every tab, key isolation, persistence, the hotkey) with the logic in `panel-model.test.js` and the confirmations in `announce.test.js`.
-
-**What jsdom cannot check** is layout, dragging and real focus. Those were checked in headless Chromium with a throwaway harness (the real bundle against a fake runtime: click, type, drag, reload, a 380px-wide viewport) and found, among others, a panel that overflowed small screens. That harness is not in the repo. The panel has not yet been run on the live site, and Firefox is untested.
