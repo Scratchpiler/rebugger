@@ -1,4 +1,4 @@
-import { suggest } from '../src/util.js';
+import { nameMatcher, suggest } from '../src/util.js';
 import { VirtualMachine, test, assert, addTarget, project, cockpit } from './helpers.js';
 import { makeRebugger } from '../src/rebugger.js';
 
@@ -186,4 +186,11 @@ test('wipe on an empty list does nothing, and it only accepts lists', () => {
     assert.deepEqual(probe.list('inv'), []);
     assert.throws(() => probe.wipe('score'), /no list named "score" \(a variable has that name\)/);
     assert.throws(() => probe.wipe('inv', { sprite: 'Bird' }), /no sprite named "Bird"/);
+});
+
+test('nameMatcher and suggest tolerate non-string names, as projects can store numeric variable names', () => {
+    assert.equal(nameMatcher('')(42), true);
+    assert.equal(nameMatcher('4')(42), true);
+    assert.equal(nameMatcher('x')(42), false);
+    assert.deepEqual(suggest('41', [42, 'speed']), [42]);
 });

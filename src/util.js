@@ -21,7 +21,7 @@ export function nameMatcher(query) {
         return name => plain.test(name);
     }
     const needle = String(query).toLowerCase();
-    return name => name.toLowerCase().includes(needle);
+    return name => String(name).toLowerCase().includes(needle);
 }
 
 export function named(map, name, noun) {
@@ -59,10 +59,10 @@ function editDistance(a, b) {
 }
 
 export function suggest(wanted, candidates, limit = 3) {
-    const needle = wanted.toLowerCase();
+    const needle = String(wanted).toLowerCase();
     const tolerance = Math.max(1, Math.floor(needle.length / 3));
     const scored = [...new Set(candidates)].flatMap(candidate => {
-        const hay = candidate.toLowerCase();
+        const hay = String(candidate).toLowerCase();
         if (candidate === wanted) return [];
         if (hay.includes(needle) || needle.includes(hay)) return [[0, candidate]];
         const distance = editDistance(needle, hay);
