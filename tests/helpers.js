@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { makeRebugger } from '../src/rebugger.js';
 
-const slvmRequire = createRequire(new URL('../../slvm/package.json', import.meta.url));
+const slvmRequire = createRequire(import.meta.url);
 export const VirtualMachine = slvmRequire('scratch-vm');
 const Sprite = slvmRequire(join(dirname(slvmRequire.resolve('scratch-vm')), '..', '..', 'src', 'sprites', 'sprite.js'));
 
@@ -97,3 +97,26 @@ export const counted = rig => {
 };
 
 export const sequence = values => () => values.shift();
+
+export const block = (id, opcode, { parent = null, next = null, inputs = {}, fields = {}, shadow = false, top = false } = {}) =>
+    ({ id, opcode, next, parent, topLevel: top, shadow, inputs, fields });
+export const input = (name, id, shadow = id) => [name, { name, block: id, shadow }];
+export const inputs = (...pairs) => Object.fromEntries(pairs.map(([name, value]) => [name, value]));
+export const number = (id, parent, value, opcode = 'math_number') => block(id, opcode, { parent, shadow: true, fields: { NUM: { name: 'NUM', value: String(value) } } });
+
+export const catBlocks = () => [
+    block('flag', 'event_whenflagclicked', { next: 'loop', top: true }),
+    block('loop', 'control_forever', { parent: 'flag', inputs: inputs(input('SUBSTACK', 'wait', null)) }),
+    block('wait', 'control_wait', { parent: 'loop', inputs: inputs(input('DURATION', 'one')) }),
+    number('one', 'wait', 1, 'math_positive_number'),
+    block('hat', 'event_whenbroadcastreceived', { next: 'spin', top: true, fields: { BROADCAST_OPTION: { name: 'BROADCAST_OPTION', id: 'msg', value: 'jump' } } }),
+    block('spin', 'control_forever', { parent: 'hat', inputs: inputs(input('SUBSTACK', 'move', null)) }),
+    block('move', 'motion_changexby', { parent: 'spin', inputs: inputs(input('DX', 'five')) }),
+    number('five', 'move', 5),
+];
+
+export const dogBlocks = () => [
+    block('flag2', 'event_whenflagclicked', { next: 'until', top: true }),
+    block('until', 'control_wait_until', { parent: 'flag2' }),
+];
+

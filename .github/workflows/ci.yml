@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the userscript and run the tests
+        run: npm test
+
+      - name: Check the userscript is what the header says it is
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          test -s rebugger.user.js
+          grep -q "^// @version      ${VERSION}$" rebugger.user.js
+          grep -q "^// ==/UserScript==$" rebugger.user.js
+
+      - name: Upload the userscript
+        if: matrix.node == 24
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebugger-userscript
+          path: rebugger.user.js
+          if-no-files-found: error
+
+  release:
+    name: Publish the latest userscript
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: rebugger-userscript
+
+      - name: Publish to the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep -m1 '@version' rebugger.user.js | awk '{print $3}')
+
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+
+          gh release create latest \
+            --title "rebugger v${VERSION}" \
+            --notes $'Install via [Tampermonkey](https://www.tampermonkey.net/): download `rebugger.user.js` below and drag it into the dashboard, or paste the raw URL into *Install from URL*.\n\nBuilt from `'"${GITHUB_SHA}"$'`.' \
+            --latest \
+            rebugger.user.js

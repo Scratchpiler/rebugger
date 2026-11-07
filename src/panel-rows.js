@@ -3,11 +3,11 @@ import {
 } from './panel-model.js';
 import { DURATION, MOTION } from './animate.js';
 
-const setText = (element, text) => {
+export const setText = (element, text) => {
     if (element.textContent !== text) element.textContent = text;
 };
 
-const setAttribute = (element, name, value) => {
+export const setAttribute = (element, name, value) => {
     if (element.getAttribute(name) !== value) element.setAttribute(name, value);
 };
 
@@ -30,6 +30,20 @@ export function reconcile(container, items, entries, make, extra) {
         entry.el.remove();
         entries.delete(key);
     }
+}
+
+const ANCHOR_CANDIDATES = 6;
+
+export function keepScroll(list, mutate) {
+    const top = list.scrollTop;
+    if (top < 1) return mutate();
+    const rows = [...list.children];
+    const first = rows.findIndex(row => row.offsetTop + row.offsetHeight > top);
+    const marks = first < 0 ? [] : rows.slice(first, first + ANCHOR_CANDIDATES).map(row => ({ row, offset: row.offsetTop - top }));
+    const result = mutate();
+    const anchor = marks.find(mark => mark.row.isConnected && mark.row.parentNode === list);
+    if (anchor) list.scrollTop = anchor.row.offsetTop - anchor.offset;
+    return result;
 }
 
 const isEditing = (input, root) => root.activeElement === input;

@@ -5,6 +5,7 @@ import { HOTKEY_LABEL } from './hotkey.js';
 import { SPEEDS, errorText, speedDigits, speedLabel, timeSummary } from './panel-model.js';
 import { PANEL_CSS } from './panel-style.js';
 import { recordingsTab, scanTab, statesTab, variablesTab } from './panel-tabs.js';
+import { threadsTab } from './panel-threads.js';
 import { VERSION } from './version.js';
 
 const PREFS_KEY = 'rebugger.panel';
@@ -41,7 +42,7 @@ function saveFile(doc, filename, text) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function createPanel({ api, document: doc, storage, restore = false, download }) {
+export function createPanel({ api, document: doc, storage, restore = false, download, clock = () => performance.now() }) {
     if (!doc) return null;
     const win = doc.defaultView;
     const h = createH(doc);
@@ -65,6 +66,7 @@ export function createPanel({ api, document: doc, storage, restore = false, down
         const chip = h('span', { class: 'chip' });
         const ctx = {
             api,
+            clock,
             h,
             root,
             download: download ?? ((filename, text) => saveFile(doc, filename, text)),
@@ -94,7 +96,7 @@ export function createPanel({ api, document: doc, storage, restore = false, down
             },
         };
 
-        const tabs = [variablesTab, scanTab, statesTab, recordingsTab].map(make => make({ h, ctx }));
+        const tabs = [variablesTab, scanTab, statesTab, recordingsTab, threadsTab].map(make => make({ h, ctx }));
         const tabButtons = new Map();
         const indicator = h('span', { class: 'tab-indicator', 'aria-hidden': 'true' });
         const tablist = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Rebugger sections' }, indicator);
@@ -200,11 +202,14 @@ export function createPanel({ api, document: doc, storage, restore = false, down
         indicator.dataset.placed = 'yes';
     }
 
+    const leaveAll = () => built?.tabs.forEach(tab => tab.leave?.());
+
     function select(id) {
         if (id !== prefs.tab) built.ctx.say(HINT, 'hint');
         remember({ tab: id });
         for (const tab of built.tabs) {
             const active = tab.id === id;
+            if (!active) tab.leave?.();
             tab.el.hidden = !active;
             built.tabButtons.get(tab.id).setAttribute('aria-selected', String(active));
             built.tabButtons.get(tab.id).tabIndex = active ? 0 : -1;
@@ -215,13 +220,15 @@ export function createPanel({ api, document: doc, storage, restore = false, down
 
     function setMinimized(minimized) {
         remember({ minimized });
+        if (minimized) leaveAll();
         built.panel.classList.toggle('minimized', minimized);
         built.minimize.replaceChildren(built.ctx.icon(minimized ? 'plus' : 'minus'));
         built.minimize.setAttribute('aria-label', minimized ? 'Expand' : 'Collapse');
     }
 
     function refresh() {
-        if (!built || built.panel.hidden || doc.hidden) return;
+        if (!built) return;
+        if (built.panel.hidden || doc.hidden) return leaveAll();
         try {
             const info = api.info();
             const summary = timeSummary(info);
@@ -261,6 +268,7 @@ export function createPanel({ api, document: doc, storage, restore = false, down
             clearTimeout(timer);
             tick();
         } else if (built) {
+            leaveAll();
             built.panel.hidden = true;
             remember({ open: false });
             clearTimeout(timer);
@@ -279,6 +287,7 @@ export function createPanel({ api, document: doc, storage, restore = false, down
         },
         destroy() {
             clearTimeout(timer);
+            leaveAll();
             built?.host.remove();
             built = null;
         },

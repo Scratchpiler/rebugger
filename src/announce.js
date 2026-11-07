@@ -52,6 +52,22 @@ const MESSAGES = {
     playrec: (_, handle) => `playing ${quoted(handle.name)}`,
     stopplay: () => 'stopped playback',
     droprec: ([name]) => `dropped recording${name === undefined ? '' : ` ${quoted(name)}`}`,
+    broadcast: ([message], started) => started.length
+        ? `broadcast ${quoted(message)}: started ${plural(started.length, 'script')} on ${[...new Set(started.map(row => row.sprite))].join(', ')}`
+        : `broadcast ${quoted(message)}: nobody is listening`,
+    startScript: (_, row) => `started ${row.sprite}: ${row.script} as thread #${row.id}`,
+};
+
+const threadLabel = row => `thread #${row.id} (${row.sprite}: ${row.script})`;
+
+const THREAD_MESSAGES = {
+    kill: row => `killed ${threadLabel(row)}`,
+    killAll: count => `killed ${plural(count, 'thread')}`,
+    pause: row => `paused ${threadLabel(row)}`,
+    resume: row => `resumed ${threadLabel(row)}`,
+    step: row => `stepping ${threadLabel(row)} one frame`,
+    restart: row => `restarted as thread #${row.id} (${row.sprite}: ${row.script})`,
+    profile: on => `thread profiling ${on ? 'on' : 'off'}`,
 };
 
 const SCAN_MESSAGES = {
@@ -101,5 +117,16 @@ export function announced(core, { enabled }) {
         };
     }
     wrapped.scan = wrapped.grep = scan;
+
+    const threads = (...args) => core.threads(...args);
+    Object.assign(threads, core.threads);
+    for (const [name, make] of Object.entries(THREAD_MESSAGES)) {
+        threads[name] = (...args) => {
+            const result = core.threads[name](...args);
+            say(make(result));
+            return result;
+        };
+    }
+    wrapped.threads = threads;
     return wrapped;
 }

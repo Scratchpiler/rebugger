@@ -1,10 +1,8 @@
-import { createRequire } from 'node:module';
+import { JSDOM } from 'jsdom';
 import { mock } from 'node:test';
 import { test, assert, VirtualMachine, addTarget, runFrame } from './helpers.js';
 import { makeRebugger } from '../src/rebugger.js';
 import { installHotkey, isHotkey } from '../src/hotkey.js';
-
-const { JSDOM } = createRequire(new URL('../../scratchpiler/package.json', import.meta.url))('jsdom');
 
 const fakeStorage = (seed = {}) => {
     const data = new Map(Object.entries(seed));
@@ -539,7 +537,7 @@ test('tabs are a real tablist: aria state follows the selection and arrows move 
         assert.equal($('#page-scan').hidden, false);
         press($('[role=tablist]'), 'ArrowLeft');
         press($('[role=tablist]'), 'ArrowLeft');
-        assert.equal(tab('Record').getAttribute('aria-selected'), 'true');
+        assert.equal(tab('Threads').getAttribute('aria-selected'), 'true');
         assert.equal($$('[role=tabpanel]').filter(p => !p.hidden).length, 1);
     });
 });
@@ -646,7 +644,7 @@ test('each row and tab carries the hue that colours it: value kind, pin mode and
         probe.unfreeze();
         probe.ui(true);
         assert.equal(row('hp').dataset.mode, 'var');
-        assert.deepEqual($$('[role=tab]').map(tab => tab.dataset.hue), ['var', 'sense', 'events', 'rec']);
+        assert.deepEqual($$('[role=tab]').map(tab => tab.dataset.hue), ['var', 'sense', 'events', 'rec', 'thread']);
     });
 });
 

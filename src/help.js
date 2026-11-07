@@ -56,6 +56,19 @@ export const HELP = [
         ],
     },
     {
+        title: 'Threads',
+        rows: [
+            ['rebugger.threads([{ monitors }])', 'every running script: id, sprite, clone, script, current block, state, ms per frame once profiling'],
+            ['rebugger.threads.kill(id) / killAll({ sprite, clone })', 'stop one script, or every script of a sprite or clone'],
+            ['rebugger.threads.pause(id) / resume(id) / step(id)', 'hold one script while the rest run; step runs it for a single frame'],
+            ['rebugger.threads.restart(id) / frames(id)', 'start a script again from its hat / its call stack with procedure arguments'],
+            ['rebugger.threads.profile([on])', 'measure ms per frame for each script (costs a little per script per frame)'],
+            ['rebugger.broadcast(message)', 'send a broadcast; returns the scripts it started (a wrong name suggests the right one)'],
+            ['rebugger.messages()', 'every broadcast with how many scripts listen for it'],
+            ['rebugger.scripts() / startScript(script)', 'every hat script / start one as if you had clicked it'],
+        ],
+    },
+    {
         title: 'Time',
         rows: [
             ['rebugger.speed([n])', 'run the project at n times speed (0.1 slow, 5 fast, Infinity flat out); no argument reads it'],

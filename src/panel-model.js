@@ -142,3 +142,125 @@ export function sparkline(series, duration) {
     const line = plotted.map(([px, py]) => `${px.toFixed(2)},${py.toFixed(2)}`).join(' ');
     return { line, area: `0,100 ${line} 100,100`, low, high: low + span };
 }
+
+const plural = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
+export function durationLabel(milliseconds) {
+    const seconds = Math.max(0, milliseconds) / 1000;
+    if (seconds < 10) return `${seconds.toFixed(1)}s`;
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    return `${Math.floor(seconds / 60)}m ${String(Math.floor(seconds % 60)).padStart(2, '0')}s`;
+}
+
+export const THREAD_FILTERS = ['All', 'Running', 'Waiting'];
+export const THREAD_SORTS = ['Oldest', 'Cost', 'Sprite', 'State'];
+export const THREAD_LINGER_MS = 1500;
+export const RESORT_MS = 2000;
+export const SUGGESTION_LIMIT = 8;
+export const FRAME_BUDGET_MS = 1000 / 30;
+
+const THREAD_COMPARE = {
+    Oldest: (a, b) => a.id - b.id,
+    Cost: (a, b) => b.ms - a.ms || a.id - b.id,
+    Sprite: (a, b) => a.sprite.localeCompare(b.sprite, undefined, { sensitivity: 'base' }) || a.clone - b.clone || a.id - b.id,
+    State: (a, b) => THREAD_STATES.indexOf(a.state) - THREAD_STATES.indexOf(b.state) || b.ms - a.ms || a.id - b.id,
+};
+const THREAD_STATES = ['running', 'waiting', 'paused', 'ended'];
+
+export const threadName = row => row.clone ? `${row.sprite} #${row.clone}` : row.sprite;
+
+export function hatShort(script) {
+    if (/^when flag clicked/.test(script)) return 'flag';
+    const receive = script.match(/^when I receive (.+)$/);
+    if (receive) return receive[1];
+    if (/^when I start as a clone/.test(script)) return 'clone';
+    const key = script.match(/^when (.+) key pressed$/);
+    if (key) return `key ${key[1]}`;
+    return script.replace(/^when /, '');
+}
+
+export function threadStateText(row) {
+    if (row.state !== 'waiting' || row.waitedMs < 1000) return row.state;
+    return `waiting ${durationLabel(row.waitedMs)}`;
+}
+
+export const threadFacts = row => [
+    `${durationLabel(row.ageMs)} old`,
+    row.state === 'waiting' || row.state === 'paused' ? `${durationLabel(row.waitedMs)} at this block` : null,
+    row.warp ? 'warp: runs without yielding' : null,
+].filter(Boolean);
+
+export function threadMs(ms) {
+    if (ms < 0.005) return '–';
+    return ms < 1 ? `${ms.toFixed(2)}ms` : `${ms.toFixed(1)}ms`;
+}
+
+export function threadSummary(rows) {
+    const count = state => rows.filter(row => row.state === state).length;
+    const live = rows.length - count('ended');
+    const parts = [plural(live, 'script'), `${count('running')} running`, `${count('waiting')} waiting`];
+    if (count('paused')) parts.push(`${count('paused')} paused`);
+    return parts.join(' · ');
+}
+
+const FILTER_TEST = {
+    All: () => true,
+    Running: row => row.state === 'running',
+    Waiting: row => row.state === 'waiting',
+};
+
+export function threadMatches(row, { text, filter }) {
+    if (!FILTER_TEST[filter](row)) return false;
+    if (!text) return true;
+    const wanted = parseFilter(text);
+    const haystack = `${row.sprite} ${row.clone ? `#${row.clone}` : ''} ${row.script} ${row.block}`;
+    return wanted instanceof RegExp ? wanted.test(haystack) : haystack.toLowerCase().includes(String(wanted).toLowerCase());
+}
+
+export function withLingering(memory, rows, now, { ttl = THREAD_LINGER_MS, hold = false } = {}) {
+    const present = new Set();
+    for (const row of rows) {
+        present.add(row.id);
+        memory.set(row.id, { row, goneAt: row.state === 'ended' ? (memory.get(row.id)?.goneAt ?? now) : null });
+    }
+    const out = [];
+    for (const [id, remembered] of memory) {
+        let entry = remembered;
+        if (!present.has(id) && entry.goneAt === null) {
+            entry = { row: { ...entry.row, state: 'ended', ms: 0, long: false }, goneAt: now };
+            memory.set(id, entry);
+        }
+        const expired = entry.goneAt !== null && !hold && now - entry.goneAt > ttl;
+        if (expired && !present.has(id)) memory.delete(id);
+        else if (!expired) out.push(entry.row);
+    }
+    return out;
+}
+
+export function stableOrder(previous, rows, sort, resort) {
+    const compare = THREAD_COMPARE[sort];
+    const byId = new Map(rows.map(row => [row.id, row]));
+    if (resort) return rows.slice().sort(compare).map(row => row.id);
+    const kept = previous.filter(id => byId.has(id));
+    const known = new Set(kept);
+    const fresh = rows.filter(row => !known.has(row.id)).sort(compare).map(row => row.id);
+    return [...kept, ...fresh];
+}
+
+export function suggestMessages(messages, text) {
+    const needle = text.trim().toLowerCase();
+    const rank = name => {
+        const lower = name.toLowerCase();
+        if (!needle) return 3;
+        if (lower === needle) return -1;
+        if (lower.startsWith(needle)) return 0;
+        if (lower.split(/[\s_-]+/).some(word => word.startsWith(needle))) return 1;
+        return lower.includes(needle) ? 2 : null;
+    };
+    return messages
+        .map(message => ({ message, rank: rank(message.name) }))
+        .filter(entry => entry.rank !== null)
+        .sort((a, b) => a.rank - b.rank || b.message.listeners - a.message.listeners || a.message.name.localeCompare(b.message.name))
+        .slice(0, SUGGESTION_LIMIT)
+        .map(entry => entry.message);
+}

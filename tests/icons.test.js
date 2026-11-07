@@ -1,9 +1,7 @@
-import { createRequire } from 'node:module';
+import { JSDOM } from 'jsdom';
 import { test, assert } from './helpers.js';
 import { createIcons } from '../src/icons.js';
 import { createSvg } from '../src/dom.js';
-
-const { JSDOM } = createRequire(new URL('../../scratchpiler/package.json', import.meta.url))('jsdom');
 
 const icons = () => {
     const { document } = new JSDOM('').window;

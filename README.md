@@ -13,7 +13,7 @@ node build.js        # writes rebugger.user.js
 node build.js --watch
 ```
 
-Add `rebugger.user.js` to Tampermonkey or Violentmonkey. The build borrows `esbuild` from `../scratchpiler`, so run `npm install` there first. Chrome-based browsers work. Firefox is untested and will have opinions.
+Add `rebugger.user.js` to Tampermonkey or Violentmonkey. Run `npm install` first: `esbuild` is the only thing the build needs. Chrome-based browsers work. Firefox is untested and will have opinions.
 
 ## What you can do to a project
 
@@ -33,6 +33,10 @@ Add `rebugger.user.js` to Tampermonkey or Violentmonkey. The build borrows `esbu
 
 **Record and replay.** Record every frame of chosen variables and sprite motion, with a ring buffer so it doesn't eat your RAM (last N frames or last N seconds), and an `until` condition that stops it a few frames after the thing you wanted happened. Replay it at any speed, scrub it, loop it, plot any recorded variable over time. Bug reports with evidence.
 
+**See every script.** The Threads tab (or `rebugger.threads()`) lists every script that is running: which sprite or clone, which hat started it, which block it is on, whether it is running or waiting, and how long it has been there. Open a row for its stack (procedure frames with their arguments) and kill it, pause it, step it a frame at a time, or restart it from the hat. Switch on **Cost** and every script gets a milliseconds-per-frame pill and the bar above the list shows who is eating the frame, so the one `run without screen refresh` loop burning 9 ms stands out in a project of 400 scripts.
+
+**Start things.** Type a broadcast and the box completes it from the project's real messages, best match first, with how many scripts listen for each. Send it and you see which scripts woke. The picker below starts any hat script as if you had clicked it. A name nobody listens for is said out loud, and a typo gets a suggestion.
+
 **Watch it.** `rebugger.watch("hp", (now, was) => console.log(was, "->", now))`, called on the frame the value changed.
 
 ## The panel
@@ -45,6 +49,7 @@ Add `rebugger.user.js` to Tampermonkey or Violentmonkey. The build borrows `esbu
 | Scan | the find-it loop above, with a tolerance for HUDs that round |
 | Savestates | save, load, drop, export to a file, import from a file. Checkboxes for restoring sprite positions and recreating deleted variables |
 | Record | record with a name filter and a limit in frames or seconds; replay or drop what you have |
+| Threads | every running script with its state and cost; kill, pause, step or restart one; broadcast with completions, or start any script |
 
 The bar at the bottom is always there: pause, step, step ten, and speed buttons from .25 to ∞.
 
@@ -95,6 +100,12 @@ rebugger.playrec("flight", 0.25)                 // the crash, in quarter speed
 | `scan(value or fn)` (alias `grep`) | find variables holding a value; call again to narrow |
 | `scan.snapshot()`, `.changed()`, `.unchanged()`, `.increased()`, `.decreased()`, `.results()`, `.reset()` | the blind loop |
 | `speed([n])`, `pause()`, `resume()`, `step([n])` | time |
+| `threads([{ monitors }])` | every running script: `id`, `sprite`, `clone`, `script`, `block`, `state` (running, waiting, paused, ended), `ms`, `ageMs`, `waitedMs`, `warp`, `long` |
+| `threads.kill(id)`, `.killAll({ sprite, clone })`, `.restart(id)` | stop one script or a sprite's scripts; start one again from its hat |
+| `threads.pause(id)`, `.resume(id)`, `.step(id)` | hold one script while the rest run; `step` lets it run for one frame |
+| `threads.frames(id)`, `threads.profile([on])` | its stack, hat first, procedure frames with arguments; measure `ms` per script per frame |
+| `broadcast(message)`, `messages()` | send a broadcast and get the scripts it started; every message with how many scripts listen |
+| `scripts()`, `startScript(script)` | every hat script; start one like a click (pass a row, or `"Cat: when I receive jump"`) |
 | `save([name])`, `load([name])`, `states()`, `drop([name])`, `export(name)`, `import(data)` | savestates |
 | `startrec([name], options)`, `stoprec()`, `recs()`, `droprec([name])` | recording |
 | `playrec(name, speed, { restore, park, loop })`, `stopplay()`, `replay()` | playback |
@@ -121,7 +132,10 @@ rebugger.playrec("flight", 0.25)                 // the crash, in quarter speed
 - **Values are stored as given.** The panel stores text that looks like a number (`42`, `-3.5`) as a number and leaves `007` and `1e3` as text, like Scratch would compare them. From the console, `set("x", "5")` stores a string.
 - **Scans cover variables, not list items,** and skip clones unless you pass `{ clones: true }`. Numbers compare as numbers, everything else as case-insensitive text. `{ within: n }` forgives HUDs that round.
 - **The panel draws 200 rows and shows the first 100 items of a list.** Narrow the filter for the rest.
+- **"Running" and "waiting" are inferred.** Scratch does not record why a script is not moving. A script on `wait`, `wait until`, a glide, a timed say or think, `ask`, `play sound until done` or `broadcast and wait`, or one blocked on a promise, is called waiting. Everything else is running, including a loop that yields every frame. Waiting on a block with no timer for ten seconds is flagged as long, which is often a bug and sometimes the point.
+- **Pausing one script does not pause the clock it is measuring.** A paused `wait 2 seconds` finishes the moment you resume if the two seconds have passed. Pause holds the script, not time.
+- **Thread cost is the time inside the script's own steps.** It includes the blocks that call into extensions and the renderer, and a script the sequencer steps several times in a frame is summed. It is measured only while the Threads tab is open.
 
 ## Status
 
-The panel, the console and everything under them are tested against a real headless scratch-vm, with the panel in jsdom, plus the built userscript installing itself into a page. `npm test`. It has been run on a live scratch.mit.edu project and works. Firefox is untested.
+The panel, the console and everything under them are tested against a real headless scratch-vm, with the panel in jsdom, plus the built userscript installing itself into a page. `npm test`. It has been run on a live scratch.mit.edu project and works. The Threads tab has been checked in headless Chromium against the real scratch-vm web build, with a project spawning a clone every 40 ms and 3,000 threads at once, but not yet on scratch.mit.edu. Firefox is untested.

@@ -1,7 +1,5 @@
-import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
-
-const esbuild = createRequire(new URL('../scratchpiler/package.json', import.meta.url))('esbuild');
+import * as esbuild from 'esbuild';
 
 const isWatch = process.argv.includes('--watch');
 const [meta, pkg] = await Promise.all([

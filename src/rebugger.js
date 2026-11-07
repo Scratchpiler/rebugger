@@ -7,6 +7,7 @@ import { createRecording } from './recording.js';
 import { createSavestates } from './savestates.js';
 import { createScan } from './scan.js';
 import { createStepper } from './stepper.js';
+import { createThreads } from './threads.js';
 import { tableRows } from './table.js';
 import { createVariables } from './variables.js';
 import { VERSION } from './version.js';
@@ -57,6 +58,7 @@ export function makeRebugger(vm, {
     const { scan, pending } = createScan(world);
     const savestates = createSavestates({ vm, runtime, world, pins });
     const recording = createRecording({ world, stepper, savestates });
+    const running = createThreads({ runtime, stepper, clock });
     let confirmations = announce;
 
     const core = {
@@ -70,11 +72,17 @@ export function makeRebugger(vm, {
         ...savestates.api,
         ...recording.api,
         ...stepper.api,
+        threads: running.threads,
+        messages: running.messages,
+        broadcast: running.broadcast,
+        scripts: running.scripts,
+        startScript: running.start,
 
         info: () => ({
             version: VERSION,
             targets: runtime.targets.length,
             threads: runtime.threads.length,
+            frameMs: runtime.currentStepTime ?? 1000 / 30,
             frozen: pins.names(),
             ...stepper.state(),
             watching: watching.count(),
@@ -85,7 +93,7 @@ export function makeRebugger(vm, {
         }),
     };
 
-    const panel = createPanel({ api: core, document, storage, restore: restorePanel, download });
+    const panel = createPanel({ api: core, document, storage, restore: restorePanel, download, clock });
 
     const rebugger = announced(core, { enabled: () => confirmations });
 
@@ -112,6 +120,7 @@ export function makeRebugger(vm, {
             watching.clear();
             scan.reset();
             recording.dispose();
+            running.dispose();
             stepper.reset();
             stepper.unhook();
         },
